@@ -1,0 +1,17 @@
+# Raw 2019-2026 crash data: too large for GitHub. See README.md for how to download it.
+2019-2023 dashboard/
+2024-2026_dashboard/
+
+# Local review page for the Flourish graphics (and any saved web pages), plus its backups
+*.html
+flourish_popups_backup_*.json
+
+# R / RStudio
+.Rproj.user/
+.Rhistory
+.RData
+.Renviron
+
+# Mac and Office clutter
+.DS_Store
+~$*

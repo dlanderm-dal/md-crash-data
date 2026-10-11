@@ -1,0 +1,53 @@
+state_abbr,state_fips,State,2024,2023,Percent Change,pop_2023,pop_2024,deaths_per_100k_2023,Deaths per 100k residents (2024),rank_deaths_per_100k_2024,% Change (2023-2024),change_pct_text,change_words,change_color,rank_band,badge_bg,badge_text
+AL,01,Alabama,962,974,-1,5108468,5157699,19.07,18.65,5,-2.2,▼ 2.2%,fewer deaths per resident,#0f7b74,1,#c71e1d,#ffffff
+AK,02,Alaska,70,61,15,733406,740133,8.32,9.46,36,13.7,▲ 13.7%,more deaths per resident,#c71e1d,4,#c3d36a,#1a1a1a
+AZ,04,Arizona,1229,1308,-6,7431344,7582384,17.6,16.21,10,-7.9,▼ 7.9%,fewer deaths per resident,#0f7b74,1,#c71e1d,#ffffff
+AR,05,Arkansas,603,596,1,3067732,3088354,19.43,19.52,2,0.5,▲ 0.5%,more deaths per resident,#c71e1d,1,#c71e1d,#ffffff
+CA,06,California,3876,4169,-7,38965193,39431263,10.7,9.83,34,-8.1,▼ 8.1%,fewer deaths per resident,#0f7b74,4,#c3d36a,#1a1a1a
+CO,08,Colorado,689,720,-4,5877610,5957494,12.25,11.57,27,-5.6,▼ 5.6%,fewer deaths per resident,#0f7b74,3,#faa916,#1a1a1a
+CT,09,Connecticut,310,308,1,3617176,3675069,8.51,8.44,43,-0.9,▼ 0.9%,fewer deaths per resident,#0f7b74,5,#8fd694,#1a1a1a
+DE,10,Delaware,126,135,-7,1031890,1051917,13.08,11.98,25,-8.4,▼ 8.4%,fewer deaths per resident,#0f7b74,3,#faa916,#1a1a1a
+DC,11,District of Columbia,47,44,7,678972,702250,6.48,6.69,48,3.3,▲ 3.3%,more deaths per resident,#c71e1d,5,#8fd694,#1a1a1a
+FL,12,Florida,3138,3375,-7,22610726,23372215,14.93,13.43,17,-10.1,▼ 10.1%,fewer deaths per resident,#0f7b74,2,#e8661a,#1a1a1a
+GA,13,Georgia,1403,1610,-13,11029227,11180878,14.6,12.55,22,-14,▼ 14.0%,fewer deaths per resident,#0f7b74,3,#faa916,#1a1a1a
+HI,15,Hawaii,102,93,10,1435138,1446146,6.48,7.05,46,8.8,▲ 8.8%,more deaths per resident,#c71e1d,5,#8fd694,#1a1a1a
+ID,16,Idaho,238,275,-13,1964726,2001619,14,11.89,26,-15,▼ 15.0%,fewer deaths per resident,#0f7b74,3,#faa916,#1a1a1a
+IL,17,Illinois,1177,1241,-5,12549689,12710158,9.89,9.26,38,-6.4,▼ 6.4%,fewer deaths per resident,#0f7b74,4,#c3d36a,#1a1a1a
+IN,18,Indiana,832,904,-8,6862199,6924275,13.17,12.02,24,-8.8,▼ 8.8%,fewer deaths per resident,#0f7b74,3,#faa916,#1a1a1a
+IA,19,Iowa,356,379,-6,3207004,3241488,11.82,10.98,30,-7.1,▼ 7.1%,fewer deaths per resident,#0f7b74,3,#faa916,#1a1a1a
+KS,20,Kansas,339,387,-12,2940547,2970606,13.16,11.41,28,-13.3,▼ 13.3%,fewer deaths per resident,#0f7b74,3,#faa916,#1a1a1a
+KY,21,Kentucky,707,814,-13,4526154,4588372,17.98,15.41,13,-14.3,▼ 14.3%,fewer deaths per resident,#0f7b74,2,#e8661a,#1a1a1a
+LA,22,Louisiana,752,811,-7,4573749,4597740,17.73,16.36,9,-7.8,▼ 7.8%,fewer deaths per resident,#0f7b74,1,#c71e1d,#ffffff
+ME,23,Maine,177,135,31,1395722,1405012,9.67,12.6,20,30.2,▲ 30.2%,more deaths per resident,#c71e1d,2,#e8661a,#1a1a1a
+MD,24,Maryland,578,621,-7,6180253,6263220,10.05,9.23,39,-8.2,▼ 8.2%,fewer deaths per resident,#0f7b74,4,#c3d36a,#1a1a1a
+MA,25,Massachusetts,363,342,6,7001399,7136171,4.88,5.09,50,4.1,▲ 4.1%,more deaths per resident,#c71e1d,5,#8fd694,#1a1a1a
+MI,26,Michigan,1098,1096,0,10037261,10140459,10.92,10.83,31,-0.8,▼ 0.8%,fewer deaths per resident,#0f7b74,3,#faa916,#1a1a1a
+MN,27,Minnesota,477,402,19,5737915,5793151,7.01,8.23,44,17.5,▲ 17.5%,more deaths per resident,#c71e1d,5,#8fd694,#1a1a1a
+MS,28,Mississippi,753,733,3,2939690,2943045,24.93,25.59,1,2.6,▲ 2.6%,more deaths per resident,#c71e1d,1,#c71e1d,#ffffff
+MO,29,Missouri,955,991,-4,6196156,6245466,15.99,15.29,14,-4.4,▼ 4.4%,fewer deaths per resident,#0f7b74,2,#e8661a,#1a1a1a
+MT,30,Montana,206,208,-1,1132812,1137233,18.36,18.11,7,-1.3,▼ 1.3%,fewer deaths per resident,#0f7b74,1,#c71e1d,#ffffff
+NE,31,Nebraska,251,227,11,1978379,2005466,11.47,12.52,23,9.1,▲ 9.1%,more deaths per resident,#c71e1d,3,#faa916,#1a1a1a
+NV,32,Nevada,417,406,3,3194176,3267467,12.71,12.76,19,0.4,▲ 0.4%,more deaths per resident,#c71e1d,2,#e8661a,#1a1a1a
+NH,33,New Hampshire,133,127,5,1402054,1409032,9.06,9.44,37,4.2,▲ 4.2%,more deaths per resident,#c71e1d,4,#c3d36a,#1a1a1a
+NJ,34,New Jersey,670,605,11,9290841,9500851,6.51,7.05,47,8.3,▲ 8.3%,more deaths per resident,#c71e1d,5,#8fd694,#1a1a1a
+NM,35,New Mexico,409,440,-7,2114371,2130256,20.81,19.2,3,-7.7,▼ 7.7%,fewer deaths per resident,#0f7b74,1,#c71e1d,#ffffff
+NY,36,New York,1101,1117,-1,19571216,19867248,5.71,5.54,49,-2.9,▼ 2.9%,fewer deaths per resident,#0f7b74,5,#8fd694,#1a1a1a
+NC,37,North Carolina,1619,1577,3,10835491,11046024,14.55,14.66,15,0.7,▲ 0.7%,more deaths per resident,#c71e1d,2,#e8661a,#1a1a1a
+ND,38,North Dakota,90,106,-15,783926,796568,13.52,11.3,29,-16.4,▼ 16.4%,fewer deaths per resident,#0f7b74,3,#faa916,#1a1a1a
+OH,39,Ohio,1157,1242,-7,11785935,11883304,10.54,9.74,35,-7.6,▼ 7.6%,fewer deaths per resident,#0f7b74,4,#c3d36a,#1a1a1a
+OK,40,Oklahoma,645,711,-9,4053824,4095393,17.54,15.75,12,-10.2,▼ 10.2%,fewer deaths per resident,#0f7b74,2,#e8661a,#1a1a1a
+OR,41,Oregon,538,587,-8,4233358,4272371,13.87,12.59,21,-9.2,▼ 9.2%,fewer deaths per resident,#0f7b74,3,#faa916,#1a1a1a
+PA,42,Pennsylvania,1127,1211,-7,12961683,13078751,9.34,8.62,42,-7.8,▼ 7.8%,fewer deaths per resident,#0f7b74,5,#8fd694,#1a1a1a
+RI,44,Rhode Island,52,71,-27,1095962,1112308,6.48,4.67,51,-27.8,▼ 27.8%,fewer deaths per resident,#0f7b74,5,#8fd694,#1a1a1a
+SC,45,South Carolina,1038,1047,-1,5373555,5478831,19.48,18.95,4,-2.8,▼ 2.8%,fewer deaths per resident,#0f7b74,1,#c71e1d,#ffffff
+SD,46,South Dakota,146,140,4,919318,924669,15.23,15.79,11,3.7,▲ 3.7%,more deaths per resident,#c71e1d,2,#e8661a,#1a1a1a
+TN,47,Tennessee,1197,1323,-10,7126489,7227750,18.56,16.56,8,-10.8,▼ 10.8%,fewer deaths per resident,#0f7b74,1,#c71e1d,#ffffff
+TX,48,Texas,4160,4294,-3,30503301,31290831,14.08,13.29,18,-5.6,▼ 5.6%,fewer deaths per resident,#0f7b74,2,#e8661a,#1a1a1a
+UT,49,Utah,277,280,-1,3417734,3503613,8.19,7.91,45,-3.5,▼ 3.5%,fewer deaths per resident,#0f7b74,5,#8fd694,#1a1a1a
+VT,50,Vermont,59,69,-14,647464,648493,10.66,9.1,41,-14.6,▼ 14.6%,fewer deaths per resident,#0f7b74,4,#c3d36a,#1a1a1a
+VA,51,Virginia,917,914,0,8715698,8811195,10.49,10.41,32,-0.8,▼ 0.8%,fewer deaths per resident,#0f7b74,4,#c3d36a,#1a1a1a
+WA,53,Washington,730,809,-10,7812880,7958180,10.35,9.17,40,-11.4,▼ 11.4%,fewer deaths per resident,#0f7b74,4,#c3d36a,#1a1a1a
+WV,54,West Virginia,256,260,-2,1770071,1769979,14.69,14.46,16,-1.5,▼ 1.5%,fewer deaths per resident,#0f7b74,2,#e8661a,#1a1a1a
+WI,55,Wisconsin,595,586,2,5910955,5960975,9.91,9.98,33,0.7,▲ 0.7%,more deaths per resident,#c71e1d,4,#c3d36a,#1a1a1a
+WY,56,Wyoming,107,144,-26,584057,587618,24.66,18.21,6,-26.1,▼ 26.1%,fewer deaths per resident,#0f7b74,1,#c71e1d,#ffffff
+US,00,USA,39254,41025,-4,334914896,340110990,12.25,11.54,,-5.8,▼ 5.8%,fewer deaths per resident,#0f7b74,,,

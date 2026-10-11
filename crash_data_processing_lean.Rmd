@@ -1,0 +1,1112 @@
+---
+title: "crash_data_processing_lean"
+author: "David Landerman"
+date: "2026-10-10"
+output: html_document
+---
+
+Same code as crashdata_clean.Rmd, rearranged. Each chunk notes which crashdata_clean Part it came from.
+
+* **Setup and import (Parts 1-3)**
+* **Analysis (Parts 4-25):** every table, with its preview chart
+* **Article fact checks 1-6:** in order
+* **Flourish graphics 1-6:** in order. Each one has two chunks:
+    * **A** exports the raw table
+    * **B** builds on A and exports `flourish_N_....csv`, which is the file to upload to Flourish
+* **Other exports:** CSVs that aren't Flourish graphics
+
+Run the chunks top to bottom.
+
+# Setup and import
+
+```{r}
+library(tidyverse)
+library(rio)
+library(lubridate)
+library(janitor)
+library(openxlsx)
+library(tidycensus)
+
+# all exported CSVs go into the "output" folder (created here if it doesn't exist)
+dir.create("output", showWarnings = FALSE)
+```
+
+```{r}
+#PART 1 IMPORT DATA (clean Part 1)
+# 2024-2026 ACRS 2.0 data, downloaded one year per file (Oct 6, 2026).
+# The 2026 files live in "2026 latest download". When you re-download 2026, rename the old folder
+# (e.g. "2026 download Oct 6") and put the new files in a fresh "2026 latest download" folder;
+# nothing in this file needs to change. Current 2026 download: Oct. 6, 2026.
+
+# ---- read each year separately (all columns as text so the years stack cleanly) ----
+report_2024_only <- read_tsv('2024-2026_dashboard/2024 Crash Map_Reports_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+report_2025_only <- read_tsv('2024-2026_dashboard/2025 Crash Map_Reports_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+report_2026_only <- read_tsv('2024-2026_dashboard/2026 latest download/2026 Crash Map_Reports_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+
+contribs_2024_only <- read_tsv('2024-2026_dashboard/2024 Crash Map_Contributing Circumstances_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+contribs_2025_only <- read_tsv('2024-2026_dashboard/2025 Crash Map_Contributing Circumstances_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+contribs_2026_only <- read_tsv('2024-2026_dashboard/2026 latest download/2026 Crash Map_Contributing Circumstances_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+
+occupants_2024_only <- read_tsv('2024-2026_dashboard/2024 Crash Map_Occupants_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+occupants_2025_only <- read_tsv('2024-2026_dashboard/2025 Crash Map_Occupants_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+occupants_2026_only <- read_tsv('2024-2026_dashboard/2026 latest download/2026 Crash Map_Occupants_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+
+nonmotorists_2024_only <- read_tsv('2024-2026_dashboard/2024 Crash Map_NonMotorists_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+nonmotorists_2025_only <- read_tsv('2024-2026_dashboard/2025 Crash Map_NonMotorists_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+nonmotorists_2026_only <- read_tsv('2024-2026_dashboard/2026 latest download/2026 Crash Map_NonMotorists_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+
+vehicles_2024_only <- read_tsv('2024-2026_dashboard/2024 Crash Map_Vehicles_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+vehicles_2025_only <- read_tsv('2024-2026_dashboard/2025 Crash Map_Vehicles_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+vehicles_2026_only <- read_tsv('2024-2026_dashboard/2026 latest download/2026 Crash Map_Vehicles_data.csv', locale = locale(encoding = "UTF-16LE"), col_types = cols(.default = col_character()))
+
+# ---- stack the three years, then let R guess the column types once on the combined table ----
+report_2024                     <- bind_rows(report_2024_only, report_2025_only, report_2026_only) |> type_convert()
+contributing_circumstances_2024 <- bind_rows(contribs_2024_only, contribs_2025_only, contribs_2026_only) |> type_convert()
+occupants_2024                  <- bind_rows(occupants_2024_only, occupants_2025_only, occupants_2026_only) |> type_convert()
+nonmotorists_2024               <- bind_rows(nonmotorists_2024_only, nonmotorists_2025_only, nonmotorists_2026_only) |> type_convert()
+vehicles_2024                   <- bind_rows(vehicles_2024_only, vehicles_2025_only, vehicles_2026_only) |> type_convert()
+
+#remove rows
+rm(list = ls(pattern = "_only$"))
+```
+
+```{r}
+#PART 2 Import Data (clean Part 2)
+
+# ---- import the older eras ----
+# 2015-2018: one Excel file per year, sheet "CRASH", 9 columns
+crash_2015 <- import('2015-2018/Crash_2015date and time.xlsx', which = 'CRASH')
+crash_2016 <- import('2015-2018/Crash_2016date and time.xlsx', which = 'CRASH')
+crash_2017 <- import('2015-2018/Crash_2017date and time.xlsx', which = 'CRASH')
+crash_2018 <- import('2015-2018/Crash_2018date and time.xlsx', which = 'CRASH')
+
+# despite the "2019" filename, this one file holds 2019 THROUGH 2023
+report_2019 <- read_tsv('2019-2023 dashboard/2019 CrashMap_REPORT_data.csv',
+                        locale = locale(encoding = "UTF-16LE"))
+```
+
+```{r}
+#PART 3 year-to-date cutoff (clean Part 3)
+# Change these two numbers to move the year-to-date cutoff everywhere in this file.
+# Every YTD comparison runs Jan 1 through this month/day, in every year.
+ytd_month <- 9
+ytd_day   <- 30
+
+# readable version for chart titles, e.g. "Sep 18"
+ytd_label <- paste(month.abb[ytd_month], ytd_day)
+
+# safety check: warn if the cutoff is later than the newest data
+last_data_date <- max(mdy(report_2024$Crashdate))
+if (make_date(year(last_data_date), ytd_month, ytd_day) > last_data_date)
+  warning("YTD cutoff (", ytd_label, ") is after the last day of data (", last_data_date, ")")
+
+ytd_label
+```
+
+# Analysis
+
+```{r}
+#Part 4 Graph Year to date for all years collected (clean Part 4)
+
+crashes_all_years <- bind_rows(
+  # 2015-2018: date is "06-15-2015" text; severity lives in REPORT_TYPE
+  bind_rows(crash_2015, crash_2016, crash_2017, crash_2018) |>
+    transmute(crash_date = mdy(ACC_DATE),
+              is_fatal   = REPORT_TYPE == "Fatal Crash"),
+
+  # 2019-2023: severity is Reporttype, same wording
+  report_2019 |>
+    transmute(crash_date = mdy(Crashdate),
+              is_fatal   = Reporttype == "Fatal Crash"),
+
+  # 2024-2026: ACRS 2.0 renamed it, and pluralized the value
+  report_2024 |>
+    transmute(crash_date = mdy(Crashdate),
+              is_fatal   = `Crash Severity Description` == "Fatal Crashes")
+) |>
+  mutate(year = year(crash_date)) |>
+  filter(!is.na(crash_date))
+
+# ---- year to date, Jan 1 through the YTD cutoff (Part 3) of each year ----
+ytd_all_years <- crashes_all_years |>
+  filter(crash_date <= make_date(year, ytd_month, ytd_day)) |>
+  group_by(year) |>
+  summarise(total_crashes = n(),
+            fatal_crashes = sum(is_fatal, na.rm = TRUE)) |>
+  mutate(pct_fatal = round(100 * fatal_crashes / total_crashes, 2))
+
+ytd_all_years
+```
+
+```{r}
+#Part 5 Graph Preview (clean Part 5)
+ggplot(ytd_all_years, aes(x = year, y = fatal_crashes)) +
+  geom_line(linewidth = 0.8, color = "#2a78d6") +
+  # hollow point for 2026 to mark it as provisional
+  geom_point(aes(fill = year == 2026), shape = 21, size = 3,
+             color = "#2a78d6", stroke = 0.9) +
+  scale_fill_manual(values = c("TRUE" = "#fcfcfb", "FALSE" = "#2a78d6"), guide = "none") +
+  scale_x_continuous(breaks = 2015:2026) +
+  scale_y_continuous(limits = c(0, NA)) +      # anchor at zero so the rises/falls stay honest
+  labs(title = paste0("Maryland fatal crashes, Jan 1 - ", ytd_label),
+       subtitle = "2026 is incomplete: fatal cases take months to finalize",
+       x = NULL, y = "fatal crashes") +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank())
+```
+
+```{r}
+#Part 6 Graph full-year fatal crashes, 2015-2025 (no 2026) (clean Part 6)
+# >>> full_year becomes FLOURISH GRAPHIC 3 (exported in 3A / 3B)
+
+full_year <- crashes_all_years |>
+  filter(year >= 2015, year <= 2025) |>       # drop 2026 -- it's only a partial year
+  group_by(year) |>
+  summarise(total_crashes = n(),
+            fatal_crashes = sum(is_fatal, na.rm = TRUE)) |>
+  mutate(pct_fatal = round(100 * fatal_crashes / total_crashes, 2))
+
+full_year
+
+ggplot(full_year, aes(x = year, y = fatal_crashes)) +
+  geom_line(linewidth = 0.8, color = "#2a78d6") +
+  geom_point(size = 2.5, color = "#2a78d6") +
+  scale_x_continuous(breaks = 2015:2025) +
+  scale_y_continuous(limits = c(0, NA)) +
+  labs(title = "Maryland fatal crashes, full year",
+       subtitle = "2015-2025",
+       x = NULL, y = "fatal crashes") +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank())
+```
+
+```{r}
+#Part 7 Graph all fatal crashes with 2026 graph stopping early as data runs out (clean Part 7)
+# >>> fatal_crashes_daily is not a Flourish graphic; it is exported in OTHER EXPORTS
+
+# last day the data covers (any crash, not just fatal) -- 2026 line stops here
+last_date <- max(mdy(report_2024$Crashdate))
+
+#NonTrafficFatal == N filters out all crashes that did not happen on a road, for instance a parking lot
+fatal_crashes_daily <- report_2024 |>
+  filter(NonTrafficFatal == "N",
+         `Crash Severity Description` == "Fatal Crashes") |>
+  mutate(crash_date = mdy(Crashdate),
+         year = year(crash_date),
+         date = format(crash_date, "%m-%d")) |>
+  count(date, year) |>
+  # add every calendar day, with 0 on days with no fatal crashes
+  # (2024 is used because it's a leap year, so Feb 29 is included)
+  complete(date = format(seq(ymd("2024-01-01"), ymd("2024-12-31"), by = "day"), "%m-%d"),
+           year,
+           fill = list(n = 0)) |>
+  arrange(date) |>
+  group_by(year) |>
+  mutate(total = cumsum(n)) |>
+  ungroup() |>
+  select(-n) |>
+  pivot_wider(names_from = year, values_from = total) |>
+  # blank out 2026 after the last day of data
+  mutate(`2026` = if_else(date > format(last_date, "%m-%d"), NA, `2026`))
+
+fatal_crashes_daily
+```
+
+```{r}
+#Part 8 Graph preview (clean Part 8)
+fatal_crashes_daily |>
+  pivot_longer(-date, names_to = "year", values_to = "total") |>
+  # use 2024 as a stand-in year so R can plot month-day on a date axis
+  mutate(plot_date = ymd(paste0("2024-", date))) |>
+  ggplot(aes(x = plot_date, y = total, color = year)) +
+  geom_line(linewidth = 1) +
+  scale_x_date(date_labels = "%b", date_breaks = "1 month") +
+  scale_color_manual(values = c("2024" = "#86b6ef",
+                                "2025" = "#3987e5",
+                                "2026" = "#0d366b"),
+                     name = NULL) +
+  labs(title = "Fatal crashes in Maryland, year to date",
+       subtitle = "Running total of fatal crashes",
+       x = NULL, y = "fatal crashes") +
+  theme_minimal() +
+  theme(legend.position = "top", panel.grid.minor = element_blank())
+```
+
+```{r}
+#Part 9 Graph total crashes across the whole state with 2026 stopping early (clean Part 9)
+# >>> all_crashes_daily becomes FLOURISH GRAPHIC 2 (exported in 2A / 2B)
+
+all_crashes_daily <- report_2024 |>
+  filter(NonTrafficFatal == "N") |>
+  mutate(crash_date = mdy(Crashdate),
+         year = year(crash_date),
+         date = format(crash_date, "%m-%d")) |>
+  count(date, year) |>
+  #fills in missing days, days where there werent any crashes
+  complete(date = format(seq(ymd("2024-01-01"), ymd("2024-12-31"), by = "day"), "%m-%d"),
+           year,
+           fill = list(n = 0)) |>
+  arrange(date) |>
+  group_by(year) |>
+  mutate(total = cumsum(n)) |>
+  ungroup() |>
+  select(-n) |>
+  pivot_wider(names_from = year, values_from = total) |>
+  mutate(`2026` = if_else(date > format(last_date, "%m-%d"), NA, `2026`))
+
+all_crashes_daily
+```
+
+```{r}
+#Part 10 Graph preview (clean Part 10)
+all_crashes_daily |>
+  pivot_longer(-date, names_to = "year", values_to = "total") |>
+  mutate(plot_date = ymd(paste0("2024-", date))) |>
+  ggplot(aes(x = plot_date, y = total, color = year)) +
+  geom_line(linewidth = 1) +
+  scale_x_date(date_labels = "%b", date_breaks = "1 month") +
+  scale_y_continuous(labels = scales::comma) +
+  scale_color_manual(values = c("2024" = "#86b6ef",
+                                "2025" = "#3987e5",
+                                "2026" = "#0d366b"),
+                     name = NULL) +
+  labs(title = "Total crashes in Maryland, year to date",
+       subtitle = "Running total of all reported crashes",
+       x = NULL, y = "crashes") +
+  theme_minimal() +
+  theme(legend.position = "top", panel.grid.minor = element_blank())
+```
+
+```{r}
+#Part 11 crashes by severity, 2024-2026: year to date AND full calendar year (clean Part 11)
+# >>> severity_full_year is ARTICLE FACT CHECK 2 and is exported in OTHER EXPORTS
+# one row per severity, one column per year, plus each severity's share of that year's crashes
+
+severity_levels <- c("Fatal Crashes", "Injury Crashes", "Property Damage Crashes")
+
+# ---- table 1: year to date, Jan 1 - YTD cutoff (Part 3) ----
+severity_ytd <- report_2024 |>
+  filter(NonTrafficFatal == "N") |>                      # on-road only, same as the other YTD tables
+  mutate(crash_date = mdy(Crashdate),
+         year = year(crash_date)) |>
+  filter(crash_date <= make_date(year, ytd_month, ytd_day)) |>
+  count(`Crash Severity Description`, year) |>           # crashes per severity per year
+  pivot_wider(names_from = year, values_from = n) |>     # years become columns
+  mutate(`Crash Severity Description` = factor(`Crash Severity Description`, levels = severity_levels)) |>
+  arrange(`Crash Severity Description`) |>               # severity order instead of alphabetical
+  # share of that year's crashes; sum() adds up the column, so this is row / year total
+  mutate(pct_2024 = 100 * `2024` / sum(`2024`),
+         pct_2025 = 100 * `2025` / sum(`2025`),
+         pct_2026 = 100 * `2026` / sum(`2026`)) |>
+  adorn_totals("row", name = "All crashes") |>           # janitor: adds a total row
+  mutate(across(starts_with("pct_"), \(x) round(x, 2)))  # round LAST so the total row is exactly 100
+
+# ---- table 2: full calendar year; 2026 is marked * because it's year to date ----
+severity_full_year <- report_2024 |>
+  filter(NonTrafficFatal == "N") |>
+  mutate(crash_date = mdy(Crashdate),
+         year = year(crash_date),
+         year = if_else(year == 2026, "2026*", as.character(year))) |>   # label 2026 with the asterisk
+  count(`Crash Severity Description`, year) |>
+  pivot_wider(names_from = year, values_from = n) |>
+  mutate(`Crash Severity Description` = factor(`Crash Severity Description`, levels = severity_levels)) |>
+  arrange(`Crash Severity Description`) |>
+  mutate(pct_2024    = 100 * `2024`  / sum(`2024`),
+         pct_2025    = 100 * `2025`  / sum(`2025`),
+         `pct_2026*` = 100 * `2026*` / sum(`2026*`)) |>
+  adorn_totals("row", name = "All crashes") |>
+  mutate(across(starts_with("pct_"), \(x) round(x, 2)))
+
+severity_ytd
+severity_full_year     # printed again in ARTICLE FACT CHECK 2
+```
+
+```{r}
+# Part 12 Graph fatalities as opposed to fatal accidents (clean Part 12)
+# >>> fatalities_daily becomes FLOURISH GRAPHIC 1 (exported in 1A / 1B)
+#running total of PEOPLE KILLED, whole state, full year 2024-2026
+# same shape as the fatal crash version above, but one row per person, not per crash
+
+fatalities_daily <- bind_rows(
+  # people in vehicles who died
+  occupants_2024 |>
+    filter(`InjuryStatus Occ` == "01") |>      # 01 = Fatal Injury
+    select(Reportnumber),
+  # pedestrians, cyclists etc. who died -- they're NOT in the occupants table
+  nonmotorists_2024 |>
+    filter(`InjuryStatus NM` == "01") |>
+    select(Reportnumber)
+) |>
+  # person tables have no date, so borrow it from the crash report.
+  # NonTrafficFatal filter keeps the definition identical to the crash chart.
+  inner_join(report_2024 |>
+               filter(NonTrafficFatal == "N") |>
+               select(Reportnumber, Crashdate),
+             by = "Reportnumber") |>
+  mutate(crash_date = mdy(Crashdate),
+         year = year(crash_date),
+         date = format(crash_date, "%m-%d")) |>
+  # from here down, identical to fatal_crashes_daily
+  count(date, year) |>
+  complete(date = format(seq(ymd("2024-01-01"), ymd("2024-12-31"), by = "day"), "%m-%d"),
+           year,
+           fill = list(n = 0)) |>
+  arrange(date) |>
+  group_by(year) |>
+  mutate(total = cumsum(n)) |>
+  ungroup() |>
+  select(-n) |>
+  pivot_wider(names_from = year, values_from = total) |>
+  mutate(`2026` = if_else(date > format(last_date, "%m-%d"), NA, `2026`))
+
+fatalities_daily
+```
+
+```{r}
+#Part 13 graph preview (clean Part 13)
+fatalities_daily |>
+  pivot_longer(-date, names_to = "year", values_to = "total") |>
+  mutate(plot_date = ymd(paste0("2024-", date))) |>
+  ggplot(aes(x = plot_date, y = total, color = year)) +
+  geom_line(linewidth = 1) +
+  scale_x_date(date_labels = "%b", date_breaks = "1 month") +
+  scale_color_manual(values = c("2024" = "#86b6ef",
+                                "2025" = "#3987e5",
+                                "2026" = "#0d366b"),
+                     name = NULL) +
+  labs(title = "People killed in Maryland crashes, running total by year",
+       subtitle = "Running total of fatalities",
+       x = NULL, y = "people killed") +
+  theme_minimal() +
+  theme(legend.position = "top", panel.grid.minor = element_blank())
+```
+
+```{r}
+#Part 14 YTD summary, 2025 vs 2026: fatalities, fatal crashes, total crashes (clean Part 14)
+# uses the YTD cutoff from Part 3. Printed in ARTICLE FACT CHECK 1.
+
+# on-road crashes, Jan 1 - YTD cutoff, 2025 and 2026 only, with a year column
+crashes_ytd_25_26 <- report_2024 |>
+  filter(NonTrafficFatal == "N") |>
+  mutate(crash_date = mdy(Crashdate),
+         year = year(crash_date)) |>
+  filter(year %in% c(2025, 2026),
+         crash_date <= make_date(year, ytd_month, ytd_day))
+
+# people killed in those crashes (occupants + non-motorists with Fatal Injury)
+deaths_ytd_25_26 <- bind_rows(
+  occupants_2024    |> filter(`InjuryStatus Occ` == "01") |> select(Reportnumber),
+  nonmotorists_2024 |> filter(`InjuryStatus NM`  == "01") |> select(Reportnumber)
+) |>
+  inner_join(select(crashes_ytd_25_26, Reportnumber, year), by = "Reportnumber")
+
+# one row per year. sum(condition) counts the rows where the condition is TRUE
+ytd_counts <- tibble(
+  year          = c("2025", "2026"),
+  fatalities    = c(sum(deaths_ytd_25_26$year == 2025),
+                    sum(deaths_ytd_25_26$year == 2026)),
+  fatal_crashes = c(sum(crashes_ytd_25_26$year == 2025 & crashes_ytd_25_26$`Crash Severity Description` == "Fatal Crashes"),
+                    sum(crashes_ytd_25_26$year == 2026 & crashes_ytd_25_26$`Crash Severity Description` == "Fatal Crashes")),
+  total_crashes = c(sum(crashes_ytd_25_26$year == 2025),
+                    sum(crashes_ytd_25_26$year == 2026))
+)
+
+# add a third row: percent change 2025 -> 2026 for each column
+# x[1] is the 2025 value, x[2] is the 2026 value
+ytd_summary <- bind_rows(
+  ytd_counts,
+  ytd_counts |>
+    summarise(year = "pct_change",
+              across(c(fatalities, fatal_crashes, total_crashes),
+                     \(x) round(100 * (x[2] - x[1]) / x[1], 1)))
+)
+```
+
+```{r}
+#Part 15 identify causes (clean Part 16)
+
+# ============================================================================
+# ROLL-UP: MHSO emphasis-area flags onto report_2024
+# Definitions: https://zerodeathsmd.gov/resources/crashdata/crashdashboard/dashboard-data-definitions/
+#
+# Each flag is built separately because each lives in a DIFFERENT table:
+#   speed + aggressive -> contributing_circumstances_2024
+#   distracted + unrestrained -> occupants_2024
+#   impairment -> report_2024's own ImpairedCrash column (the state's flag)
+#
+# Every block follows the same three steps:
+#   1. filter that table down to the rows that meet the definition
+#   2. distinct(Reportnumber) -> collapse to ONE row per crash
+#      (a crash with 3 speeding drivers should flag once, not three times)
+#   3. mutate(flag = TRUE) -> a column to carry over in the join
+# ============================================================================
+
+
+# ---- AGGRESSIVE DRIVING -----------------------------------------------------
+# MHSO: at least one driver showing >= TWO of these behaviors.
+# Their published list is ACRS 1.0 wording; these are the ACRS 2.0 equivalents
+# actually present in the data. "Exceeded speed limit" was eliminated in 2024.
+aggressive_values <- c(
+  "Failed to Yield Right-of-Way",                            # failed to yield ROW
+  "Ran Stop Sign",                                           # was "failed to obey stop sign"
+  "Ran Red Light",                                           # was "failed to obey traffic signal"
+  "Disregarded Other Traffic Sign",                          # other traffic control
+  "Wrong Side",                                              # was "failed to keep right of center"
+  "Failed To Stop For School Bus",
+  "Too Fast For Conditions",
+  "Followed Too Closely",
+  "Failed to Keep in Proper Lane",                           # closest to "improper lane change"
+  "Improper Passing",
+  "Disregard Officer Directions",
+  "Disregarded Other Road Markings",
+  "Other Improper Action",
+  "Operated Motor Vehicle in Reckless or Aggressive Manner"  # "erratic/reckless"
+)
+
+flag_aggressive <- contributing_circumstances_2024 |>
+  filter(`Contribs Type` == "Driver",                    # driver actions only, not road/weather/vehicle
+         `Contribs Description` %in% aggressive_values) |>
+  # distinct() first so the same behavior logged twice for one driver isn't double-counted
+  distinct(Reportnumber, `Person ID Contribs`, `Contribs Description`) |>
+  count(Reportnumber, `Person ID Contribs`) |>           # how many DIFFERENT behaviors per driver
+  filter(n >= 2) |>                                      # the ">= two" test, per driver
+  distinct(Reportnumber) |>
+  mutate(aggressive_driving = TRUE)
+
+
+# ---- SPEED RELATED ----------------------------------------------------------
+# MHSO 2024 update: "Exceeded the speed limit" is no longer an attribute, so from
+# 2024 onward this counts ONLY "too fast for conditions". One value, no >=2 rule.
+flag_speed <- contributing_circumstances_2024 |>
+  filter(`Contribs Type` == "Driver",
+         `Contribs Description` == "Too Fast For Conditions") |>
+  distinct(Reportnumber) |>
+  mutate(speed_related = TRUE)
+
+
+# ---- DISTRACTED DRIVING -----------------------------------------------------
+# ACRS 2.0 replaced the old fields with "Distracted By Action". MHSO counts a
+# driver as distracted on any affirmative value there.
+# NOTE: this field is only ever populated for drivers, never passengers, so no
+# extra driver filter is needed. "Not Distracted" and "Unknown" are excluded.
+flag_distracted <- occupants_2024 |>
+  filter(`TypeOfOccupant Description` == "Driver",
+         `DistractedByAction Occ Description` %in% c(
+    "Texting",
+    "Talking/listening",
+    "Manually Operating (dialing, playing game, etc.)",
+    "Other Action (looking away from task, etc.)"
+  )) |>
+  distinct(Reportnumber) |>
+  mutate(distracted_driving = TRUE)
+
+
+# ---- IMPAIRMENT -------------------------------------------------------------
+# Uses the state's own flag, ImpairedCrash (Yes/No), already on every crash report.
+# It includes Person Condition ("Under the Influence of Alcohol, Drugs, and/or
+# Medication"), which isn't in the public export, so we can't rebuild it ourselves.
+flag_impaired <- report_2024 |>
+  filter(ImpairedCrash == "Yes") |>
+  distinct(Reportnumber) |>
+  mutate(impairment = TRUE)
+
+
+# ---- UNRESTRAINED OCCUPANTS -------------------------------------------------
+# MHSO: "Persons (vehicle occupants only), who are FATALLY INJURED ... where the
+# Safety Equipment Used field was indicated to be 'None.' Drivers of
+# motorcycles, ATVs, or mopeds are not included."
+#
+# The exclusion needs vehicle body type, which lives in vehicles_2024.
+# occupants_2024$`VehicleID Occ` links to vehicles_2024$VehicleID.
+
+# vehicles where a restraint doesn't apply, so "None" isn't a finding
+no_restraint_vehicles <- c(
+  "Motorcycle - 2 Wheeled",
+  "Motorcycle - 3 Wheeled",
+  "Moped Or motorized bicycle",
+  "All-Terrain Vehicle/All-Terrain Cycle (ATV/ATC)"
+)
+
+flag_unrestrained <- occupants_2024 |>
+  filter(`Restraint Occ Description` == "None",
+         `InjuryStatus Occ` == "01") |>                    # 01 = Fatal Injury
+  # pull in body type; select() first so we don't drag 69 vehicle columns along
+  left_join(select(vehicles_2024, VehicleID, `BodyType Veh Description`),
+            by = c("VehicleID Occ" = "VehicleID")) |>
+  # MHSO excludes DRIVERS of these vehicles -- passengers on them still count
+  filter(!(`TypeOfOccupant Description` == "Driver" &
+           `BodyType Veh Description` %in% no_restraint_vehicles)) |>
+  distinct(Reportnumber) |>
+  mutate(unrestrained = TRUE)
+
+
+# ---- JOIN ALL FIVE ONTO report_2024 -----------------------------------------
+# left_join keeps every crash and attaches TRUE where the flag table has a match.
+# Crashes with no match get NA, so replace_na() turns those into FALSE --
+# otherwise sum() and filter() on these columns behave unpredictably.
+report_2024_flagged <- report_2024 |>
+  left_join(flag_speed,        by = "Reportnumber") |>
+  left_join(flag_aggressive,   by = "Reportnumber") |>
+  left_join(flag_distracted,   by = "Reportnumber") |>
+  left_join(flag_impaired,     by = "Reportnumber") |>
+  left_join(flag_unrestrained, by = "Reportnumber") |>
+  mutate(across(c(speed_related, aggressive_driving, distracted_driving,
+                  impairment, unrestrained), ~ replace_na(.x, FALSE))) |>
+  # a sixth flag: TRUE when none of the five above are set.
+  # MUST come after the replace_na() above -- !NA is NA, so if the FALSEs
+  # weren't filled in first this column would be full of NAs.
+  mutate(no_category = !speed_related & !aggressive_driving &
+                       !distracted_driving & !impairment & !unrestrained)
+
+
+# sanity check: should match the number of rows in report_2024. If it grew, a flag
+# table had duplicate Reportnumbers and the distinct() step failed somewhere.
+nrow(report_2024_flagged)
+```
+
+```{r}
+#Part 16 causes by county and causes by county year to date (clean Part 17)
+# ---- causes_by_county: FULL YEAR -------------------------------------------
+# straight from report_2024_flagged -- no fatal_ytd in between
+causes_by_county <- report_2024_flagged |>
+  # fatal, on-roadway crashes only
+  filter(NonTrafficFatal == "N",
+         `Crash Severity Description` == "Fatal Crashes") |>
+  # turn the text date into a real date, and pull out the year
+  mutate(crash_date = mdy(Crashdate),
+         year = year(crash_date)) |>
+  # one bucket per county-year, then collapse each bucket to one row
+  group_by(county = `Crash County Description`, year) |>
+  summarise(
+    fatal_crashes  = n(),
+    n_speed        = sum(speed_related),
+    n_aggressive   = sum(aggressive_driving),
+    n_distracted   = sum(distracted_driving),
+    n_impairment   = sum(impairment),
+    n_unrestrained = sum(unrestrained),
+    n_no_category  = sum(no_category),
+    .groups = "drop"
+  ) |>
+  mutate(
+    pct_speed        = round(100 * n_speed        / fatal_crashes, 1),
+    pct_aggressive   = round(100 * n_aggressive   / fatal_crashes, 1),
+    pct_distracted   = round(100 * n_distracted   / fatal_crashes, 1),
+    pct_impairment   = round(100 * n_impairment   / fatal_crashes, 1),
+    pct_unrestrained = round(100 * n_unrestrained / fatal_crashes, 1),
+    pct_no_category  = round(100 * n_no_category  / fatal_crashes, 1)
+  ) |>
+  # 2026 minus 2024, on the 2026 row only. group_by(county) lets each row
+  # see the other years of its own county. sum() of the 2024 value instead
+  # of the value itself so a county with no 2024 row counts as 0, not an error.
+  group_by(county) |>
+  mutate(change_26_vs_24 = if_else(year == 2026,
+                                   fatal_crashes - sum(fatal_crashes[year == 2024]),
+                                   NA)) |>
+  ungroup() |>
+  arrange(county, year)
+
+
+# ---- causes_by_county_ytd: JAN 1 - YTD CUTOFF -----------------------------
+# identical to the one above EXCEPT the one line marked below
+causes_by_county_ytd <- report_2024_flagged |>
+  filter(NonTrafficFatal == "N",
+         `Crash Severity Description` == "Fatal Crashes") |>
+  mutate(crash_date = mdy(Crashdate),
+         year = year(crash_date)) |>
+  filter(crash_date <= make_date(year, ytd_month, ytd_day)) |>      # <-- THE ONLY DIFFERENCE
+  group_by(county = `Crash County Description`, year) |>
+  summarise(
+    fatal_crashes  = n(),
+    n_speed        = sum(speed_related),
+    n_aggressive   = sum(aggressive_driving),
+    n_distracted   = sum(distracted_driving),
+    n_impairment   = sum(impairment),
+    n_unrestrained = sum(unrestrained),
+    n_no_category  = sum(no_category),
+    .groups = "drop"
+  ) |>
+  mutate(
+    pct_speed        = round(100 * n_speed        / fatal_crashes, 1),
+    pct_aggressive   = round(100 * n_aggressive   / fatal_crashes, 1),
+    pct_distracted   = round(100 * n_distracted   / fatal_crashes, 1),
+    pct_impairment   = round(100 * n_impairment   / fatal_crashes, 1),
+    pct_unrestrained = round(100 * n_unrestrained / fatal_crashes, 1),
+    pct_no_category  = round(100 * n_no_category  / fatal_crashes, 1)
+  ) |>
+  group_by(county) |>
+  mutate(change_26_vs_24 = if_else(year == 2026,
+                                   fatal_crashes - sum(fatal_crashes[year == 2024]),
+                                   NA)) |>
+  ungroup() |>
+  arrange(county, year)
+
+causes_by_county
+causes_by_county_ytd
+```
+
+```{r}
+#Part 17 statewide fatal crashes by cause, year to date (Jan 1 - YTD cutoff) (clean Part 18)
+# >>> statewide_causes_ytd_wide becomes FLOURISH GRAPHIC 5 (exported in 5A / 5B)
+# builds two versions of the same numbers from causes_by_county_ytd:
+#   statewide_causes_ytd_wide -> years as rows, causes as columns
+#   statewide_causes_ytd      -> causes as rows, years as columns
+
+cause_order <- c("All fatal crashes", "Impairment", "Aggressive driving",
+                 "Unrestrained occupants", "Speed related",
+                 "Distracted driving", "None of the five")
+
+# years as rows: add up the 24 counties into one statewide row per year,
+# then give the columns readable names
+statewide_causes_ytd_wide <- causes_by_county_ytd |>
+  group_by(year) |>
+  summarise(across(c(fatal_crashes, starts_with("n_")), sum)) |>
+  rename(`All fatal crashes`      = fatal_crashes,
+         Impairment               = n_impairment,
+         `Aggressive driving`     = n_aggressive,
+         `Unrestrained occupants` = n_unrestrained,
+         `Speed related`          = n_speed,
+         `Distracted driving`     = n_distracted,
+         `None of the five`       = n_no_category) |>
+  select(year, all_of(cause_order))                       # put the columns in cause_order
+
+# causes as rows: flip the table above (long, then wide the other way)
+statewide_causes_ytd <- statewide_causes_ytd_wide |>
+  pivot_longer(-year, names_to = "cause", values_to = "crashes") |>
+  mutate(cause = factor(cause, levels = cause_order)) |>
+  pivot_wider(names_from = year, values_from = crashes) |>
+  arrange(cause)
+
+statewide_causes_ytd_wide
+statewide_causes_ytd
+```
+
+```{r}
+#Part 18 Causes by county, top cause (clean Part 19)
+
+# leading 2024 cause per county
+#
+# Filters:
+#   - from causes_by_county_ytd: Jan 1 - YTD cutoff, traffic fatal crashes only
+#   - counties with MORE than 20 fatal crashes in 2024
+#   - leading cause = the flag with the most 2024 fatal crashes (no_category excluded)
+
+# causes_by_county names its columns n_speed etc.; this matches them to the flag names
+cause_names <- c(n_speed        = "speed_related",
+                 n_aggressive   = "aggressive_driving",
+                 n_distracted   = "distracted_driving",
+                 n_impairment   = "impairment",
+                 n_unrestrained = "unrestrained")
+
+top_causes <- causes_by_county_ytd |>
+  filter(year == 2024, fatal_crashes>20) |>
+  select(county, all_of(names(cause_names))) |>
+  pivot_longer(-county, names_to = "cause", values_to = "n") |>
+  mutate(cause = unname(cause_names[cause])) |>
+  slice_max(n, n = 1, by = county, with_ties = FALSE)
+
+top_causes     # printed again in ARTICLE FACT CHECK 4
+```
+
+```{r}
+# Part 19: each county's leading cause, fatal crashes per year (Jan 1 - YTD cutoff) (clean Part 20)
+# >>> top_cause_yearly_wide becomes FLOURISH GRAPHIC 4 (exported in 4A / 4B)
+
+top_cause_yearly <- causes_by_county_ytd |>
+  select(county, year, all_of(names(cause_names))) |>
+  pivot_longer(-c(county, year), names_to = "cause", values_to = "n") |>
+  mutate(cause = unname(cause_names[cause])) |>
+  inner_join(select(top_causes, county, cause), by = c("county", "cause")) |>
+  mutate(series = paste0(county, " - ", cause))
+
+# wide table for Flourish: year in column 1, one column per county
+top_cause_yearly_wide <- top_cause_yearly |>
+  select(year, series, n) |>
+  pivot_wider(names_from = series, values_from = n, values_fill = 0)
+
+top_cause_yearly_wide
+```
+
+```{r}
+#Part 20 impairment ytd declines graph (clean Part 21)
+ggplot(top_cause_yearly, aes(x = factor(year), y = n, group = series)) +
+  geom_line(linewidth = 1, color = "#1c5cab") +
+  geom_point(size = 2, color = "#1c5cab") +
+  facet_wrap(~ series, scales = "free_y") +
+  expand_limits(y = 0) +
+  labs(title = "Leading cause of fatal crashes in Maryland's highest-fatality counties",
+       subtitle = paste0("Jan 1 - ", ytd_label, "; counties with 20+ fatal crashes in 2024"),
+       x = NULL, y = "fatal crashes") +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+```
+
+```{r}
+# Part 21 more detail on impairment progress (clean Part 22)
+# >>> top_cause_daily_wide is not a Flourish graphic; it is exported in OTHER EXPORTS
+#
+# Full year for 2024 and 2025; 2026 stops at last_date (needs last_date from Part 7 run first)
+
+top_cause_daily <- report_2024_flagged |>
+  filter(NonTrafficFatal == "N",
+         `Crash Severity Description` == "Fatal Crashes") |>
+  mutate(crash_date = mdy(Crashdate),
+         year = year(crash_date),
+         date = format(crash_date, "%m-%d")) |>
+  rename(county = `Crash County Description`) |>
+  pivot_longer(all_of(unname(cause_names)), names_to = "cause", values_to = "flag") |>
+  filter(flag) |>
+  inner_join(select(top_causes, county, cause), by = c("county", "cause")) |>
+  count(county, cause, year, date) |>
+  # every calendar day for every county/year, 0 on days with no crashes
+  complete(nesting(county, cause), year,
+           date = format(seq(ymd("2024-01-01"), ymd("2024-12-31"), by = "day"), "%m-%d"),
+           fill = list(n = 0)) |>
+  arrange(county, year, date) |>
+  group_by(county, cause, year) |>
+  mutate(total = cumsum(n)) |>
+  ungroup() |>
+  mutate(total = if_else(year == 2026 & date > format(last_date, "%m-%d"), NA, total),
+         series = paste0(county, " - ", cause))
+
+# wide table: date in column 1, one column per county + year
+top_cause_daily_wide <- top_cause_daily |>
+  mutate(column = paste0(series, " - ", year)) |>
+  select(date, column, total) |>
+  pivot_wider(names_from = column, values_from = total)
+
+top_cause_daily_wide
+
+top_cause_daily |>
+  mutate(plot_date = ymd(paste0("2024-", date))) |>
+  ggplot(aes(x = plot_date, y = total, color = factor(year))) +
+  geom_line(linewidth = 0.8) +
+  facet_wrap(~ series, scales = "free_y") +
+  scale_x_date(date_labels = "%b", date_breaks = "2 months") +
+  scale_color_manual(values = c("2024" = "#86b6ef",
+                                "2025" = "#3987e5",
+                                "2026" = "#0d366b"),
+                     name = NULL) +
+  labs(title = "Leading cause of fatal crashes, running total by county",
+       subtitle = paste0("Counties with 20+ fatal crashes in 2024 (Jan 1 - ", ytd_label, ")"),
+       x = NULL, y = "fatal crashes") +
+  theme_minimal() +
+  theme(legend.position = "top", panel.grid.minor = element_blank())
+```
+
+```{r}
+#Part 22 (clean Part 23)
+# fatal crashes Jan 1 - YTD cutoff: one row per year, one column per county
+county_fatal_ytd_wide <- causes_by_county_ytd |>
+  # select() FIRST so only these three columns get reshaped --
+  # anything else left in (like a change column) would end up as fake data
+  select(year, county, fatal_crashes) |>
+  pivot_wider(names_from = county, values_from = fatal_crashes, values_fill = 0) |>
+  arrange(year)
+
+county_fatal_ytd_wide
+```
+
+```{r}
+#Part 23 (clean Part 24)
+# counties with 20+ fatal crashes Jan 1 - YTD cutoff, 2024
+big_counties <- causes_by_county_ytd |>
+  filter(year == 2024, fatal_crashes >= 20) |>
+  pull(county)
+
+county_fatal_ytd_wide |>
+  select(year, all_of(big_counties)) |>
+  pivot_longer(-year, names_to = "county", values_to = "fatal_crashes") |>
+  ggplot(aes(x = factor(year), y = fatal_crashes, color = county, group = county)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  expand_limits(y = 0) +
+  scale_color_manual(values = c("#2a78d6", "#eb6834", "#1baf7a",
+                                "#eda100", "#e87ba4", "#008300")) +
+  labs(title = "Fatal crashes in Maryland's highest-fatality counties",
+       subtitle = paste0("Jan 1 - ", ytd_label, ", counties with 20+ fatal crashes in 2024"),
+       x = NULL, y = "fatal crashes", color = NULL) +
+  theme_minimal() +
+  theme(panel.grid.minor = element_blank())
+```
+
+```{r}
+#Part 24 state populations from the Census -- API pull, run once (clean Part 25, step 4)
+#    B01003_001 = total population. acs1 = the single-year survey, which
+#    matches a single year of deaths better than the default 5-year average.
+pop_2023 <- get_acs(geography = "state", variables = "B01003_001",
+                    year = 2023, survey = "acs1") |>
+  select(state_fips = GEOID, pop_2023 = estimate)
+
+pop_2024 <- get_acs(geography = "state", variables = "B01003_001",
+                    year = 2024, survey = "acs1") |>
+  select(state_fips = GEOID, pop_2024 = estimate)
+```
+
+```{r}
+#Part 25 FARS deaths by state (clean Part 25, steps 1-7; steps 8-10 are in FLOURISH GRAPHIC 6B)
+# >>> fars_national becomes FLOURISH GRAPHIC 6 (exported in 6A / 6B)
+# 1. import
+fars_national <- read_csv('FARS/FARS national.csv')
+
+# 3. state abbreviation + FIPS code, placed before the State column.
+#    fips_codes is a lookup table that ships with tidycensus; distinct()
+#    because it has one row per COUNTY and we only need one per state.
+fars_national <- fars_national |>
+  left_join(distinct(fips_codes, state_name, state, state_code),
+            by = c("State" = "state_name")) |>
+  # the national "USA" row has no match in the lookup, so fill it by hand
+  mutate(state      = if_else(State == "USA", "US", state),
+         state_code = if_else(State == "USA", "00", state_code)) |>
+  relocate(state_abbr = state, state_fips = state_code, .before = State)
+
+fars_national <- fars_national |>
+  left_join(pop_2023, by = "state_fips") |>
+  left_join(pop_2024, by = "state_fips") |>
+  # USA row: add up the 50 states + DC
+  mutate(pop_2023 = if_else(State == "USA", sum(pop_2023[State != "USA"]), pop_2023),
+         pop_2024 = if_else(State == "USA", sum(pop_2024[State != "USA"]), pop_2024)) |>
+
+# 5. deaths per 100,000 residents
+  mutate(deaths_per_100k_2023 = `2023` / pop_2023 * 100000,
+         deaths_per_100k_2024 = `2024` / pop_2024 * 100000,
+# 6. percent change in that rate, 2023 to 2024
+         pct_change_per_100k  = 100 * (deaths_per_100k_2024 - deaths_per_100k_2023) /
+                                deaths_per_100k_2023,
+# 7. rank of the 2024 rate, highest = 1. The USA row is set to NA before
+#    ranking, so it is excluded and gets NA instead of a rank.
+         rank_deaths_per_100k_2024 = min_rank(desc(
+           if_else(State == "USA", NA_real_, deaths_per_100k_2024)))) |>
+  # round LAST, so the percent change and rank are calculated from unrounded rates
+  mutate(across(c(deaths_per_100k_2023, deaths_per_100k_2024), ~ round(.x, 2)),
+         pct_change_per_100k = round(pct_change_per_100k, 1)) |>
+  relocate(rank_deaths_per_100k_2024, .after = deaths_per_100k_2024)
+
+fars_national
+```
+
+# Article fact checks
+
+```{r}
+#ARTICLE FACT CHECK 1 (built in Part 14)
+ytd_summary
+```
+
+```{r}
+#ARTICLE FACT CHECK 2 (built in Part 11)
+severity_full_year
+cat("* 2026 is year to date: Jan 1 -", format(last_data_date, "%b %d, %Y"), "\n")
+```
+
+```{r}
+#ARTICLE FACT CHECK 3
+# impairment percent change, 2024 to 2026 YTD
+imp_2024 <- statewide_causes_ytd_wide$Impairment[statewide_causes_ytd_wide$year == 2024]
+imp_2026 <- statewide_causes_ytd_wide$Impairment[statewide_causes_ytd_wide$year == 2026]
+
+round((imp_2026 - imp_2024) / imp_2024 * 100, 1)
+```
+
+```{r}
+#ARTICLE FACT CHECK 4 (built in Part 18)
+top_causes
+```
+
+```{r}
+#ARTICLE FACT CHECK 5
+# Prince George's impairment percent change, 2024 to 2026 YTD
+pg_2024 <- top_cause_yearly_wide$`Prince George's - impairment`[top_cause_yearly_wide$year == 2024]
+pg_2026 <- top_cause_yearly_wide$`Prince George's - impairment`[top_cause_yearly_wide$year == 2026]
+
+round((pg_2026 - pg_2024) / pg_2024 * 100, 1)
+
+# Prince George's ALL fatal crashes percent change, 2024 to 2026 YTD (from Part 22)
+pg_all_2024 <- county_fatal_ytd_wide$`Prince George's`[county_fatal_ytd_wide$year == 2024]
+pg_all_2026 <- county_fatal_ytd_wide$`Prince George's`[county_fatal_ytd_wide$year == 2026]
+
+round((pg_all_2026 - pg_all_2024) / pg_all_2024 * 100, 1)
+```
+
+```{r}
+#ARTICLE FACT CHECK 6
+# DC, MD, VA: deaths per 100k residents and rank (1 = highest), 2024
+fars_national |>
+  filter(state_abbr %in% c("DC", "MD", "VA")) |>
+  select(State, deaths_per_100k_2024, rank_deaths_per_100k_2024) |>
+  arrange(rank_deaths_per_100k_2024)
+
+# extra check (clean Part 26): how many states' rates fell vs rose
+fars_national |>
+  filter(State != "USA") |>
+  summarise(fell = sum(pct_change_per_100k < 0),
+            rose = sum(pct_change_per_100k > 0))
+```
+
+# Flourish graphics
+
+```{r}
+#FLOURISH GRAPHIC 1A raw
+# Graphic 1: people killed in Maryland crashes, running total by day, 2024-2026
+# Built in Part 12. One row per calendar day ("MM-DD"), one column per year.
+# On-road crashes only; 2026 is blank after the last day of data.
+export(fatalities_daily, "output/fatalities_daily.csv")
+```
+
+```{r}
+#FLOURISH GRAPHIC 1B for Flourish (clean Part 15)
+# Upload this file to Flourish, not 1A.
+# Adds `date-full`, an exact copy of the date column, so the popup can format the
+# date separately from the x-axis.
+export(fatalities_daily |>
+         mutate(`date-full` = date, .after = date),   # exact copy of date, placed right after it
+       "output/flourish_1_fatalities_daily.csv")
+```
+
+```{r}
+#FLOURISH GRAPHIC 2A raw
+# Graphic 2: all reported crashes in Maryland, running total by day, 2024-2026
+# Built in Part 9. One row per calendar day ("MM-DD"), one column per year.
+# On-road crashes only; 2026 is blank after the last day of data.
+export(all_crashes_daily, "output/all_crashes_daily.csv")
+```
+
+```{r}
+#FLOURISH GRAPHIC 2B for Flourish
+# Upload this file to Flourish, not 2A.
+# Adds `date-full`, an exact copy of the date column, so the popup can format the
+# date separately from the x-axis.
+export(all_crashes_daily |>
+         mutate(`date-full` = date, .after = date),   # exact copy of date, placed right after it
+       "output/flourish_2_all_crashes_daily.csv")
+```
+
+```{r}
+#FLOURISH GRAPHIC 3A raw
+# Graphic 3: Maryland fatal crashes, full calendar year, 2015-2025
+# Built in Part 6. One row per year: total crashes, fatal crashes, % fatal.
+# Includes off-road crashes (no NonTrafficFatal filter here, unlike the 2024-2026 tables).
+export(full_year, "output/full_year.csv")
+```
+
+```{r}
+#FLOURISH GRAPHIC 3B for Flourish
+# Upload this file to Flourish, not 3A.
+# Same columns as the Flourish sheet: 2025's count moves from fatal_crashes into its
+# own highlight column, so the chart can color 2025 differently. Built here so the
+# 2025 number always comes from the data, never typed by hand.
+full_year |>
+  mutate(highlight     = if_else(year == 2025, fatal_crashes, NA),   # 2025 only
+         fatal_crashes = if_else(year == 2025, NA, fatal_crashes)) |> # blank for 2025
+  export("output/flourish_3_full_year.csv")
+```
+
+```{r}
+#FLOURISH GRAPHIC 4A raw
+# Graphic 4: impairment-related fatal crashes in the six counties with more than
+# 20 fatal crashes in 2024, Jan 1 - YTD cutoff, 2024-2026
+# Built in Part 19. One row per year, one column per county ("County - cause").
+export(top_cause_yearly_wide, "output/top_cause_yearly_wide.csv")
+```
+
+```{r}
+#FLOURISH GRAPHIC 4B for Flourish
+# Upload this file to Flourish, not 4A.
+# Shortens the county column names for Flourish ("Anne Arundel - impairment" -> "Anne Arundel")
+# and marks Baltimore City with an asterisk for its popup note.
+# Then adds one "... change" column per county: the % change vs. 2024, as a short
+# colored line of HTML for the popup (blank in 2024). In Flourish, the county
+# columns go under Values and the "... change" columns under Info for popups.
+#
+# add_change_html() is defined here and reused in 5B.
+# Red + up arrow = more than 2024, teal + down arrow = fewer, same colors as the FARS popup.
+add_change_html <- function(df) {
+  df |>
+    mutate(across(-year, \(x) {
+      p     <- round((x - x[year == 2024]) / x[year == 2024] * 100, 1)
+      color <- case_when(p > 0 ~ "#c71e1d", p < 0 ~ "#0f7b74", TRUE ~ "#666666")
+      arrow <- case_when(p > 0 ~ "▲ ", p < 0 ~ "▼ ", TRUE ~ "")
+      if_else(year == 2024, "",
+              paste0("<span style='font-weight:700;color:", color, ";'>", arrow, abs(p), "%</span>",
+                     " vs. this time in 2024"))
+    }, .names = "{.col} change"))
+}
+
+top_cause_yearly_wide |>
+  rename_with(\(name) str_remove(name, " - impairment")) |>   # drop " - impairment" from the 6 county names
+  rename(`Baltimore City*` = `Baltimore City`) |>              # asterisk for the popup note
+  add_change_html() |>
+  export("output/flourish_4_top_cause_yearly_wide.csv")
+```
+
+```{r}
+#FLOURISH GRAPHIC 5A raw
+# Graphic 5: Maryland fatal crashes by MHSO cause, statewide, Jan 1 - YTD cutoff, 2024-2026
+# Built in Part 17. One row per year, one column per cause, plus "All fatal crashes".
+# A crash can count under more than one cause, so the causes don't add up to the total.
+export(statewide_causes_ytd_wide, "output/statewide_causes_ytd_wide.csv")
+```
+
+```{r}
+#FLOURISH GRAPHIC 5B for Flourish
+# Upload this file to Flourish, not 5A.
+# Adds one "... change" column per cause: the % change vs. 2024, as a short
+# colored line of HTML for the popup (blank in 2024). In Flourish, the cause
+# columns go under Values and the "... change" columns under Info for popups.
+# Needs add_change_html() from 4B, so run 4B first.
+export(add_change_html(statewide_causes_ytd_wide), "output/flourish_5_statewide_causes_ytd_wide.csv")
+```
+
+```{r}
+#FLOURISH GRAPHIC 6A raw
+# Graphic 6: traffic deaths per 100,000 residents by state, 2024, and the change since 2023
+# Built in Part 25 from FARS deaths + Census populations. One row per state + DC,
+# plus a USA row. Rank 1 = highest death rate; the USA row isn't ranked.
+export(fars_national, "output/fars_national.csv")
+```
+
+```{r}
+#FLOURISH GRAPHIC 6B for Flourish (clean Part 25, steps 8-10)
+# Upload this file to Flourish, not 6A.
+# Adds the popup pieces the map's tooltip uses (arrow + % text, wording, color,
+# rank badge colors), then renames two columns to the display names shown in
+# Flourish's buttons and popup.
+fars_national_flourish <- fars_national |>
+# 8. tooltip pieces for the change stat. A tooltip can't choose a color or
+#    an arrow by itself, so build them here: red + up arrow if the rate rose,
+#    teal + down arrow if it fell. Built from the rounded value so they match
+#    the number shown on the map.
+  mutate(rose = pct_change_per_100k > 0,
+         change_pct_text = paste0(if_else(rose, "▲ ", "▼ "),
+                                  sprintf("%.1f", abs(pct_change_per_100k)), "%"),
+         change_words    = if_else(rose, "more deaths per resident",
+                                         "fewer deaths per resident"),
+         change_color    = if_else(rose, "#c71e1d", "#0f7b74")) |>
+  select(-rose) |>
+# 9. rank band (5 groups of ~10 states) and the badge colors for that band.
+#    Badge colors match the popup's spectrum bar (red = highest death rates),
+#    so the badge and the marker under it are always the same color.
+#    Text color is set per band so the badge stays readable on every fill.
+  mutate(rank_band  = case_when(rank_deaths_per_100k_2024 <= 10 ~ 1,
+                                rank_deaths_per_100k_2024 <= 20 ~ 2,
+                                rank_deaths_per_100k_2024 <= 31 ~ 3,
+                                rank_deaths_per_100k_2024 <= 41 ~ 4,
+                                rank_deaths_per_100k_2024 <= 51 ~ 5),
+         badge_bg   = c("#c71e1d", "#e8661a", "#faa916", "#c3d36a", "#8fd694")[rank_band],
+         badge_text = c("#ffffff", "#1a1a1a", "#1a1a1a", "#1a1a1a", "#1a1a1a")[rank_band]) |>
+# 10. rename to the display names used in Flourish (control buttons + tooltip).
+#     Done LAST so every calculation above can use the plain names.
+  rename(`Deaths per 100k residents (2024)` = deaths_per_100k_2024,
+         `% Change (2023-2024)`             = pct_change_per_100k)
+
+export(fars_national_flourish, "output/flourish_6_fars_national.csv")
+```
+
+# Other exports
+
+```{r}
+#OTHER EXPORTS (not Flourish graphics)
+export(fatal_crashes_daily, "output/fatal_crashes_daily.csv")
+export(severity_full_year, "output/severity_full_year.csv")
+export(top_cause_daily_wide, 'output/top_cause_daily_wide.csv')
+```
