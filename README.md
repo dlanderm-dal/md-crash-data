@@ -108,3 +108,27 @@ The FARS rates use state populations from the Census Bureau's American Community
 1. Install the packages listed in the Rmd's first chunk (`tidyverse`, `rio`, `lubridate`, `janitor`, `openxlsx`, `tidycensus`).
 2. Open `crash_data_processing_lean.Rmd` in RStudio and run all chunks (or Knit).
 3. Results land in `output/`. The files to upload to Flourish are the `output/flourish_N_…csv` ones.
+
+## Establish a year-to-date benchmark
+
+2026 is a partial year, so comparing it with full years of 2024 and 2025 would make 2026 look artificially low. Instead, the year-to-date (YTD) tables compare the **same stretch of the calendar in every year**: Jan. 1 through a cutoff date.
+
+**Where it's set.** Part 3 of the Rmd sets the cutoff with two numbers:
+
+```r
+ytd_month <- 9
+ytd_day   <- 30
+```
+
+Change those two lines and every year-to-date comparison in the file moves with them. Part 3 also builds a readable label (`ytd_label`, e.g. "Sep 30") for chart titles. It prints a warning if the cutoff falls after the last day in the data.
+
+**How the cutoff was chosen.** For this reporting, the cutoff is the **end of the last full month before the download**. The data was downloaded Oct. 6, 2026, so the cutoff is Sept. 30. The most recent days are always incomplete, because police reports are approved and submitted to ACRS days to weeks after a crash. In this data, daily counts dropped off sharply in the final days before the download. 2026's year-to-date fatal crash count also rose between two downloads taken a few weeks apart. Stopping at the end of the previous month leaves time for most of those reports to arrive. After a new download, move the cutoff to the end of the month before it.
+
+**What uses it.** Every table filtered with `crash_date <= make_date(year, ytd_month, ytd_day)`:
+
+- **Part 4:** fatal and total crashes, Jan. 1 to the cutoff, every year since 2015.
+- **Part 11:** crashes by severity, year to date (`severity_ytd`).
+- **Part 14:** the 2025 vs. 2026 summary of people killed, fatal crashes and total crashes.
+- **Part 16:** fatal crashes by county and cause, year to date (`causes_by_county_ytd`). This feeds the statewide cause table (Flourish graphic 5), each big county's leading cause (graphic 4) and the county tables.
+
+The running-total charts (Flourish graphics 1 and 2) aren't cut off this way. They show every day of each year, and the 2026 line simply stops at the last day in the data.
