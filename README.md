@@ -11,7 +11,7 @@ R analysis of Maryland police crash reports (2015–2026) and national FARS traf
 | `FARS/FARS national.csv` | State traffic deaths, 2023 and 2024, from NHTSA's Fatality Analysis Reporting System. Included in the repo. |
 | `output/` | Every CSV the Rmd writes, including the `flourish_N_…csv` files uploaded to Flourish. |
 
-The 2019–2026 crash data is **not** in the repo (the files are too large for GitHub), and neither is the local review page for the Flourish graphics. Download it with the steps below and put it in the folders shown, with the exact file names shown, so the Rmd finds it.
+The 2019–2026 crash data is **not** in the repo (the files are too large for GitHub). Download it with the steps below and put it in the folders shown, with the exact file names shown, so the Rmd finds it.
 
 ## Folder layout the Rmd expects
 
